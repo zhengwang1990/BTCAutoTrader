@@ -4,7 +4,6 @@ import base64
 import datetime
 import hashlib
 import hmac
-import json
 import logging
 import os
 import requests
@@ -23,7 +22,7 @@ class CoinbaseExchangeAuth(requests.auth.AuthBase):
   def __call__(self, request):
     timestamp = str(time.time())
     message = (timestamp + request.method + request.path_url +
-               (request.body or ''))
+               (request.body.decode() if request.body else ''))
     hmac_key = base64.b64decode(self.secret_key)
     signature = hmac.new(hmac_key, message.encode(), hashlib.sha256)
     signature_b64 = base64.b64encode(signature.digest())
@@ -38,7 +37,6 @@ class CoinbaseExchangeAuth(requests.auth.AuthBase):
 
 
 class CoinbaseTrade(object):
-
   def __init__(self, auth):
     self.auth = auth
 
@@ -55,10 +53,10 @@ class CoinbaseTrade(object):
   def GetEMAs(self):
 
     def EMA(N, prices):
-      res = [prices[0]]
+      res = prices[0]
       k = 2 / (N + 1)
       for i in range(1, len(prices)):
-        res.append(prices[i] * k + res[-1] * (1 - k))
+        res = prices[i] * k + res * (1 - k)
       return res
 
     history = requests.get(API_BASE_URL + 'products/BTC-USD/candles',
@@ -67,41 +65,59 @@ class CoinbaseTrade(object):
     last_entry = history[-1]
     last_time = last_entry[0]
     prices = [entry[4] for entry in history]
-    last_ema12 = EMA(12, prices)[-1]
-    last_ema26 = EMA(26, prices)[-1]
+    last_ema12 = EMA(12, prices)
+    last_ema26 = EMA(26, prices)
     return last_time, last_ema12, last_ema26
 
   def Sell(self):
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
-        if account['currency'] == 'BTC':
-            size = account['balance']
+      if account['currency'] == 'BTC':
+        size = '%.8f' % float(account['balance'])
+        break
     params = {
         'type': 'market',
         'side': 'sell',
         'product_id': 'BTC-USD',
         'size': size,
     }
-    requests.post(API_BASE_URL + 'orders', auth=self.auth, params=params)
-    self.PrintContentBlock('SELL',
-                           ['Sell BTC of %.8f' % float(size)] +
-                           self.GetAccountInfo())
+    response = requests.post(API_BASE_URL + 'orders', auth=self.auth,
+                             json=params)
+    if not response.ok:
+      logging.error('Sell failed with status %d: %s.',
+                    response.status_code,
+                    response.json().get('message', response.reason))
+    else:
+      self.PrintContentBlock('SELL',
+                             ['Sell BTC of %s' % size,
+                              'Transaction ID: %s' % response.json().get('id'),
+                              'Status: %s' % response.json().get('status')] +
+                             self.GetAccountInfo())
 
   def Buy(self):
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
-        if account['currency'] == 'USD':
-            funds = account['balance']
+      if account['currency'] == 'USD':
+        funds = '%.2f' % float(account['balance'])
+        break
     params = {
         'type': 'market',
         'side': 'buy',
         'product_id': 'BTC-USD',
         'funds': funds,
     }
-    requests.post(API_BASE_URL + 'orders', auth=self.auth, params=params)
-    self.PrintContentBlock('BUY',
-                           ['Buy BTC with $%.2f' % float(funds)] +
-                           self.GetAccountInfo())
+    response = requests.post(API_BASE_URL + 'orders', auth=self.auth,
+                             json=params)
+    if not response.ok:
+      logging.error('Buy failed with status %d: %s.',
+                    response.status_code,
+                    response.json().get('message', response.reason))
+    else:
+      self.PrintContentBlock('BUY',
+                             ['Buy BTC with $%s' % funds,
+                              'Transaction ID: %s' % response.json().get('id'),
+                              'Status: %s' % response.json().get('status')] +
+                             self.GetAccountInfo())
 
   def Hold(self):
     self.PrintContentBlock('HOLD',
@@ -110,7 +126,7 @@ class CoinbaseTrade(object):
   def Trade(self):
     self.PrintContentBlock('ACCOUNT INFO', self.GetAccountInfo())
     last_time, last_ema12, last_ema26 = self.GetEMAs()
-    logging.info('Current EMAs: EMA-12 %.2f, EMA-26 %.2f',
+    logging.info('Previous EMAs: EMA-12 %.2f, EMA-26 %.2f',
                  last_ema12, last_ema26)
     while True:
       current = time.time()

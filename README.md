@@ -1,14 +1,12 @@
-# BTC Audo Trade
-
-![BTC](https://en.bitcoin.it//w/images/en/2/29/BC_Logo_.png)
+# BTC Auto Trader <img src="https://en.bitcoin.it//w/images/en/2/29/BC_Logo_.png" alt="BTC" width="40">
 
 Automatically trade BTC-USD on [Coinbase Pro](https://pro.coinbase.com).
 
 ## Trading Strategy
  * Get historical trading data at granularity of 5 min.
  * Calculate exponential moving average (EMA) for EMA-12 and EMA-26.
- * If EMA-12 and EMA-26 have a cross, perform one of the following actions.
-   * If EMA-12 goes above EMA-26, buy BTC with all UST balance.
+ * If EMA-12 and EMA-26 curves intersect, perform one of the following actions.
+   * If EMA-12 goes above EMA-26, buy BTC with all USD balance.
    * If EMA-12 goes below EMA-26, sell all BTC.
 
 ## How To Run
@@ -19,7 +17,7 @@ Automatically trade BTC-USD on [Coinbase Pro](https://pro.coinbase.com).
    export API_KEY="<your_API_key>"
    export API_SECRET="<your_API_secret>"
    export API_PASS="<your_API_pass>"
-   python3 ./coinbase.py --logfile coinbase.log
+   python3 ./coinbase.py
    ```
  * The text output will always be written to standard error. Besides,
    `--logfile` is an optional flag, which will also writes text output to
