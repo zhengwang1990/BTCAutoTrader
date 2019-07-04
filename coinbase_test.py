@@ -2,7 +2,9 @@
 import base64
 import coinbase
 import logging
+import os
 import requests
+import time
 import unittest
 from unittest.mock import patch
 from unittest.mock import Mock
@@ -89,6 +91,11 @@ class CoinbaseTradeTest(unittest.TestCase):
           sell.assert_called_once()
           log.assert_called_once()
 
+  def testHold(self):
+    with patch.object(coinbase.CoinbaseTrade, 'GetAccountInfo') as account:
+      self.trade.Hold()
+      account.assert_called_once()
+
   def testGetEMAs(self):
     with patch.object(requests, 'get',
                       side_effect=self.mock_candles_up):
@@ -116,6 +123,35 @@ class CoinbaseTradeTest(unittest.TestCase):
       with patch.object(coinbase.CoinbaseTrade, 'Sell') as sell:
         self.trade.Trade(199, 100, 90)
         sell.assert_called_once()
+
+  def testPrintContentBlock(self):
+    with patch.object(logging, 'info') as log:
+      self.trade.PrintContentBlock('title', ['contents'])
+      log.assert_called_once()
+
+  def testStart(self):
+    with patch.object(coinbase.CoinbaseTrade, 'GetEMAs',
+                      return_value = (time.time(), 0, 0)):
+      with patch.object(coinbase.CoinbaseTrade, 'GetAccountInfo'):
+        with patch.object(coinbase.CoinbaseTrade, 'Trade',
+                          side_effect=Exception) as trade:
+          with patch.object(time, 'sleep',
+                            side_effect=[None, Exception]):
+            with patch.object(logging, 'exception') as log:
+              with self.assertRaises(Exception):
+                self.trade.Start()
+              trade.assert_called_once()
+              log.assert_called_once()
+
+  def testMain(self):
+    with patch.object(coinbase.CoinbaseTrade, 'Start') as start:
+      with patch.object(logging, 'basicConfig') as config:
+        with patch.dict(os.environ, {'API_KEY': 'fake_key',
+                                     'API_SECRET': 'fake_secret',
+                                     'API_PASS': 'fake_pass'}):
+          coinbase.main()
+          start.assert_called_once()
+          config.assert_called_once()
 
 
 class CoinbaseExchangeAuthTest(unittest.TestCase):
