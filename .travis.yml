@@ -1,0 +1,10 @@
+sudo: false
+language: python
+python:
+  - "3.6"
+install:
+  - pip install requests codecov
+script:
+  - coverage run coinbase_test.py
+after_success:
+  - codecov

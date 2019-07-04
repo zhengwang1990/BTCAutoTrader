@@ -1,5 +1,7 @@
 # BTC Auto Trader <img src="https://en.bitcoin.it//w/images/en/2/29/BC_Logo_.png" alt="BTC" width="40">
 
+[![Build Status](https://travis-ci.org/zhengwang1990/BTCAutoTrader.svg?branch=master)](https://travis-ci.org/zhengwang1990/BTCAutoTrader)
+[![codecov.io](https://codecov.io/gh/zhengwang1990/BTCAutoTrader/branch/master/graphs/badge.svg)](https://codecov.io/github/zhengwang1990/BTCAutoTrader)
 Automatically trade BTC-USD on [Coinbase Pro](https://pro.coinbase.com).
 
 ## Trading Strategy

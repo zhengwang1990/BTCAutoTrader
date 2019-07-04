@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 import coinbase
 import logging
 import requests
@@ -12,7 +13,7 @@ class MockAccountResponse(object):
     pass
 
   def json(self):
-    return [{'currency': 'USD', 'balance': '100.123456'},
+    return [{'currency': 'USD', 'balance': '100.129456'},
             {'currency': 'BTC', 'balance': '0.123456789'}]
 
 
@@ -115,6 +116,20 @@ class CoinbaseTradeTest(unittest.TestCase):
       with patch.object(coinbase.CoinbaseTrade, 'Sell') as sell:
         self.trade.Trade(199, 100, 90)
         sell.assert_called_once()
+
+
+class CoinbaseExchangeAuthTest(unittest.TestCase):
+  def testCall(self):
+    auth = coinbase.CoinbaseExchangeAuth('fake_api_key',
+                                         base64.b64encode(b'fake_secret_key'),
+                                         'fake_pass_phrase')
+    request = requests.Request('POST', 'http://localhost',
+                               json={'key': 'value'})
+    updated_request = auth(request.prepare())
+    self.assertEqual(updated_request.headers['CB-ACCESS-KEY'],
+                     'fake_api_key')
+    self.assertEqual(updated_request.headers['CB-ACCESS-PASSPHRASE'],
+                     'fake_pass_phrase')
 
 
 if __name__ == '__main__':

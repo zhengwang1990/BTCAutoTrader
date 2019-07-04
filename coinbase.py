@@ -91,6 +91,7 @@ class CoinbaseTrade(object):
       self.PrintContentBlock('SELL',
                              ['Sell BTC of %s' % size,
                               'Transaction ID: %s' % response.json().get('id'),
+                              'BTC Price: %s' % response.json().get('price'),
                               'Status: %s' % response.json().get('status')] +
                              self.GetAccountInfo())
 
@@ -116,6 +117,7 @@ class CoinbaseTrade(object):
       self.PrintContentBlock('BUY',
                              ['Buy BTC with $%s' % funds,
                               'Transaction ID: %s' % response.json().get('id'),
+                              'BTC Price: %s' % response.json().get('price'),
                               'Status: %s' % response.json().get('status')] +
                              self.GetAccountInfo())
 
