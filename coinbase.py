@@ -146,6 +146,8 @@ class CoinbaseTrade(object):
     logging.info('Previous EMAs: Time %s, EMA-12 %.2f, EMA-26 %.2f',
                  datetime.datetime.fromtimestamp(last_time).strftime('%H:%M'),
                  last_ema12, last_ema26)
+    if time.time() - last_time < 300:
+      last_time -= 300
     while True:
       current = time.time()
       remain_time = last_time + 600 - current
