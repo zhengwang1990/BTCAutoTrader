@@ -98,7 +98,7 @@ class CoinbaseTrade(object):
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
       if account['currency'] == 'USD':
-        funds = '%.2f' % float(account['balance'])
+        funds = '%.2f' % (int(float(account['balance']) * 100) / 100)
         break
     params = {
         'type': 'market',
