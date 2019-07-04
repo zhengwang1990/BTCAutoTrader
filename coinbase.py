@@ -41,6 +41,7 @@ class CoinbaseTrade(object):
     self.auth = auth
 
   def GetAccountInfo(self):
+    """Gets account USD and BTC balances."""
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
       if account['currency'] == 'USD':
@@ -51,7 +52,7 @@ class CoinbaseTrade(object):
             'BTC: %.8f' % float(btc_account['balance'])]
 
   def GetEMAs(self):
-
+    """Gets most current EMA values."""
     def EMA(N, prices):
       res = prices[0]
       k = 2 / (N + 1)
@@ -70,6 +71,7 @@ class CoinbaseTrade(object):
     return last_time, last_ema12, last_ema26
 
   def Sell(self):
+    """Sells BTC with market order."""
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
       if account['currency'] == 'BTC':
@@ -81,21 +83,10 @@ class CoinbaseTrade(object):
         'product_id': 'BTC-USD',
         'size': size,
     }
-    response = requests.post(API_BASE_URL + 'orders', auth=self.auth,
-                             json=params)
-    if not response.ok:
-      logging.error('Sell failed with status %d: %s.',
-                    response.status_code,
-                    response.json().get('message', response.reason))
-    else:
-      self.PrintContentBlock('SELL',
-                             ['Sell BTC of %s' % size,
-                              'Transaction ID: %s' % response.json().get('id'),
-                              'BTC Price: %s' % response.json().get('price'),
-                              'Status: %s' % response.json().get('status')] +
-                             self.GetAccountInfo())
+    self.Transaction(params)
 
   def Buy(self):
+    """Buys BTC with market order."""
     accounts = requests.get(API_BASE_URL + 'accounts', auth=self.auth).json()
     for account in accounts:
       if account['currency'] == 'USD':
@@ -107,25 +98,40 @@ class CoinbaseTrade(object):
         'product_id': 'BTC-USD',
         'funds': funds,
     }
+    self.Transaction(params)
+
+  def Transaction(self, params):
+    """Performs a buy or sell transaction."""
+    side = params['side']
     response = requests.post(API_BASE_URL + 'orders', auth=self.auth,
                              json=params)
     if not response.ok:
-      logging.error('Buy failed with status %d: %s.',
+      logging.error('%s failed with status %d: %s.',
+                    side.capitalize(),
                     response.status_code,
                     response.json().get('message', response.reason))
     else:
-      self.PrintContentBlock('BUY',
-                             ['Buy BTC with $%s' % funds,
-                              'Transaction ID: %s' % response.json().get('id'),
-                              'BTC Price: %s' % response.json().get('price'),
-                              'Status: %s' % response.json().get('status')] +
-                             self.GetAccountInfo())
+      time.sleep(1)  # wait 1s for order to be filled
+      order_id = response.json().get('id')
+      fills = requests.get(API_BASE_URL + 'fills',
+                           auth=self.auth,
+                           params={'order_id': order_id})
+      fill_info = ['Buy BTC with $%s' % params['funds'] if side == 'buy'
+                   else 'Sell BTC of %s' % params['size']]
+      if fills.ok:
+        for fill in fills.json():
+          fill_info.extend(['Trade ID: %s' % fill.get('trade_id'),
+                            'BTC pirce: %s' % fill.get('price'),
+                            'Fee: %s' % fill.get('fee')])
+      self.PrintContentBlock(side.upper(), fill_info + self.GetAccountInfo())
 
   def Hold(self):
+    """Holds current balance."""
     self.PrintContentBlock('HOLD',
                            ['Hold current balance'] + self.GetAccountInfo())
 
   def Trade(self, last_time, last_ema12, last_ema26):
+    """Makes a trading decision."""
     new_time, new_ema12, new_ema26 = self.GetEMAs()
     while new_time == last_time:
       time.sleep(1)

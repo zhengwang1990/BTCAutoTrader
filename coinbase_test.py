@@ -19,14 +19,23 @@ class MockAccountResponse(object):
             {'currency': 'BTC', 'balance': '0.123456789'}]
 
 
-class MockTransactionResponse(object):
+class MockOrderResponse(object):
   def __init__(self, status_code=200, reason=''):
     self.status_code = status_code
     self.reason = reason
     self.ok = status_code == 200
 
   def json(self):
-    return {'id': 'transaction_id', 'status': 'pending'}
+    return {'id': 'order_id', 'status': 'pending'}
+
+
+class MockFillResponse(object):
+  def __init__(self):
+    self.ok = True
+
+  def json(self):
+    return [{'trade_id': 'trade_id', 'fee': '0.25',
+            'price': '12345'}]
 
 
 class MockCandleResponse(object):
@@ -44,28 +53,24 @@ class MockCandleResponse(object):
 class CoinbaseTradeTest(unittest.TestCase):
   def setUp(self):
     self.trade = coinbase.CoinbaseTrade(Mock())
-    self.mock_accounts_response = Mock(return_value=MockAccountResponse())
-    self.mock_success_transaction = Mock(return_value=MockTransactionResponse())
-    self.mock_fail_transaction = Mock(
-        return_value=MockTransactionResponse(400, 'Unknown'))
-    self.mock_candles_up = Mock(return_value=MockCandleResponse('up'))
-    self.mock_candles_down = Mock(return_value=MockCandleResponse('down'))
 
   def testBuySuccess(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_accounts_response):
+                      side_effect=[MockAccountResponse(),
+                                   MockFillResponse(),
+                                   MockAccountResponse()]):
       with patch.object(requests, 'post',
-                        side_effect=self.mock_success_transaction) as buy:
+                        return_value=MockOrderResponse()) as buy:
         with patch.object(coinbase.CoinbaseTrade, 'PrintContentBlock') as block:
-          self.trade.Buy()
-          buy.assert_called_once()
-          block.assert_called_once()
+          with patch.object(time, 'sleep'):
+            self.trade.Buy()
+            buy.assert_called_once()
+            block.assert_called_once()
 
   def testBuyFailure(self):
-    with patch.object(requests, 'get',
-                      side_effect=self.mock_accounts_response):
+    with patch.object(requests, 'get', return_value=MockAccountResponse()):
       with patch.object(requests, 'post',
-                        side_effect=self.mock_fail_transaction) as buy:
+                        return_value=MockOrderResponse(400, 'Unknown')) as buy:
         with patch.object(logging, 'error') as log:
           self.trade.Buy()
           buy.assert_called_once()
@@ -73,19 +78,22 @@ class CoinbaseTradeTest(unittest.TestCase):
 
   def testSellSuccess(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_accounts_response):
+                      side_effect=[MockAccountResponse(),
+                                   MockFillResponse(),
+                                   MockAccountResponse()]):
       with patch.object(requests, 'post',
-                        side_effect=self.mock_success_transaction) as sell:
+                        return_value=MockOrderResponse()) as sell:
         with patch.object(coinbase.CoinbaseTrade, 'PrintContentBlock') as block:
-          self.trade.Sell()
-          sell.assert_called_once()
-          block.assert_called_once()
+          with patch.object(time, 'sleep'):
+            self.trade.Sell()
+            sell.assert_called_once()
+            block.assert_called_once()
 
   def testSellFailure(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_accounts_response):
+                      return_value=MockAccountResponse()):
       with patch.object(requests, 'post',
-                        side_effect=self.mock_fail_transaction) as sell:
+                        return_value=MockOrderResponse(400, 'Unknown')) as sell:
         with patch.object(logging, 'error') as log:
           self.trade.Sell()
           sell.assert_called_once()
@@ -98,28 +106,28 @@ class CoinbaseTradeTest(unittest.TestCase):
 
   def testGetEMAs(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_candles_up):
+                      return_value=MockCandleResponse('up')):
       t, ema12, ema26 = self.trade.GetEMAs()
       self.assertGreater(ema12, ema26)
       self.assertEqual(t, 200)
 
   def testTradeHold(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_candles_up):
+                      return_value=MockCandleResponse('up')):
       with patch.object(coinbase.CoinbaseTrade, 'Hold') as hold:
         self.trade.Trade(199, 100, 90)
         hold.assert_called_once()
 
   def testTradeBuy(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_candles_up):
+                      return_value=MockCandleResponse('up')):
       with patch.object(coinbase.CoinbaseTrade, 'Buy') as buy:
         self.trade.Trade(199, 90, 100)
         buy.assert_called_once()
 
   def testTradeSell(self):
     with patch.object(requests, 'get',
-                      side_effect=self.mock_candles_down):
+                      return_value=MockCandleResponse('down')):
       with patch.object(coinbase.CoinbaseTrade, 'Sell') as sell:
         self.trade.Trade(199, 100, 90)
         sell.assert_called_once()
