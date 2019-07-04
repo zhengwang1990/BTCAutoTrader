@@ -123,36 +123,37 @@ class CoinbaseTrade(object):
     self.PrintContentBlock('HOLD',
                            ['Hold current balance'] + self.GetAccountInfo())
 
-  def Trade(self):
+  def Trade(self, last_time, last_ema12, last_ema26):
+    new_time, new_ema12, new_ema26 = self.GetEMAs()
+    while new_time == last_time:
+      time.sleep(1)
+      new_time, new_ema12, new_ema26 = self.GetEMAs()
+    logging.info('Current EMAs: Time %s, EMA-12 %.2f, EMA-26 %.2f',
+                 datetime.datetime.fromtimestamp(new_time).strftime('%H:%M'),
+                 new_ema12, new_ema26)
+    if (new_ema26 - new_ema12) * (last_ema26 - last_ema12) <= 0:
+      if new_ema26 > new_ema12:
+        self.Sell()
+      else:
+        self.Buy()
+    else:
+      self.Hold()
+    return new_time, new_ema12, new_ema26
+
+  def Start(self):
     self.PrintContentBlock('ACCOUNT INFO', self.GetAccountInfo())
     last_time, last_ema12, last_ema26 = self.GetEMAs()
-    logging.info('Previous EMAs: EMA-12 %.2f, EMA-26 %.2f',
+    logging.info('Previous EMAs: Time %s, EMA-12 %.2f, EMA-26 %.2f',
+                 datetime.datetime.fromtimestamp(last_time).strftime('%H:%M'),
                  last_ema12, last_ema26)
     while True:
       current = time.time()
       remain_time = last_time + 600 - current
       if remain_time > 0:
         time.sleep(remain_time + 1)
-        continue
-      new_time, new_ema12, new_ema26 = self.GetEMAs()
-      if new_time == last_time:
-        time.sleep(1)
-        continue
-      logging.info('Current EMAs: EMA-12 %.2f, EMA-26 %.2f',
-                   new_ema12, new_ema26)
-      if (new_ema26 - new_ema12) * (last_ema26 - last_ema12) <= 0:
-        if new_ema26 > new_ema12:
-          self.Sell()
-        else:
-          self.Buy()
-      else:
-        self.Hold()
-      last_time, last_ema12, last_ema26 = new_time, new_ema12, new_ema26
-
-  def Start(self):
-    while True:
       try:
-        self.Trade()
+        last_time, last_ema12, last_ema26 = self.Trade(
+            last_time, last_ema12, last_ema26)
       except Exception as e:
         logging.exception(e)
         time.sleep(60)
