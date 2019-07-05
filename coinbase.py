@@ -11,7 +11,9 @@ import time
 
 
 API_BASE_URL = 'https://api.pro.coinbase.com/'
-
+# It is currently impossible to get real-time historical data. There is a ~5min
+# delay of the latest historical data
+DATA_DELAY = 300
 
 class CoinbaseExchangeAuth(requests.auth.AuthBase):
   def __init__(self, api_key, secret_key, passphrase):
@@ -37,8 +39,9 @@ class CoinbaseExchangeAuth(requests.auth.AuthBase):
 
 
 class CoinbaseTrade(object):
-  def __init__(self, auth):
+  def __init__(self, auth, granularity):
     self.auth = auth
+    self.granularity = granularity
 
   def GetAccountInfo(self):
     """Gets account USD and BTC balances."""
@@ -60,9 +63,10 @@ class CoinbaseTrade(object):
         res = prices[i] * k + res * (1 - k)
       return res
 
-    history = requests.get(API_BASE_URL + 'products/BTC-USD/candles',
-                           auth=self.auth,
-                           params={'granularity': 300}).json()[::-1]
+    history = requests.get(
+        API_BASE_URL + 'products/BTC-USD/candles',
+        auth=self.auth,
+        params={'granularity': self.granularity}).json()[::-1]
     last_entry = history[-1]
     last_time = last_entry[0]
     prices = [entry[4] for entry in history]
@@ -154,12 +158,13 @@ class CoinbaseTrade(object):
     logging.info('Previous EMAs: Time %s, EMA-12 %.2f, EMA-26 %.2f',
                  datetime.datetime.fromtimestamp(last_time).strftime('%H:%M'),
                  last_ema12, last_ema26)
-    if time.time() - last_time < 300:
-      last_time -= 300
+    if time.time() - last_time < DATA_DELAY:
+      last_time -= self.granularity
     while True:
       current = time.time()
-      remain_time = last_time + 600 - current
+      remain_time = last_time + self.granularity + DATA_DELAY - current
       if remain_time > 0:
+        logging.info('Waiting %ds for next EMA query', remain_time + 1)
         time.sleep(remain_time + 1)
       try:
         last_time, last_ema12, last_ema26 = self.Trade(
@@ -180,6 +185,8 @@ def main():
   parser = argparse.ArgumentParser(description='Coinbase Auto Trade')
   parser.add_argument(
       '--logfile', default='', help='Log file.')
+  parser.add_argument(
+      '--granularity', default=360, type=int, help='Granularity of EMAs.')
   args = parser.parse_args()
   handlers = [logging.StreamHandler()]
   if args.logfile:
@@ -191,7 +198,7 @@ def main():
   auth = CoinbaseExchangeAuth(os.environ['API_KEY'],
                               os.environ['API_SECRET'],
                               os.environ['API_PASS'])
-  trade = CoinbaseTrade(auth)
+  trade = CoinbaseTrade(auth, args.granularity)
   trade.Start()
 
 

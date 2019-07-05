@@ -52,7 +52,7 @@ class MockCandleResponse(object):
 
 class CoinbaseTradeTest(unittest.TestCase):
   def setUp(self):
-    self.trade = coinbase.CoinbaseTrade(Mock())
+    self.trade = coinbase.CoinbaseTrade(Mock(), 300)
 
   def testBuySuccess(self):
     with patch.object(requests, 'get',
